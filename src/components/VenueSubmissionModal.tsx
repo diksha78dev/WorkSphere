@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 import { X, MapPin, Loader2 } from "lucide-react";
 
 interface VenueSubmissionModalProps {
@@ -30,6 +30,7 @@ export function VenueSubmissionModal({
   onSubmitSuccess,
 }: VenueSubmissionModalProps) {
   const { isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -72,6 +73,7 @@ export function VenueSubmissionModal({
     setUploadStatus("Uploading image...");
 
     try {
+      const token = await getToken();
       let imageUrl = null;
       if (file) {
         const uploadData = new FormData();
@@ -79,6 +81,9 @@ export function VenueSubmissionModal({
 
         const uploadRes = await fetch("/api/upload", {
           method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
           body: uploadData,
         });
 
@@ -95,7 +100,10 @@ export function VenueSubmissionModal({
 
       const response = await fetch("/api/venues", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify({
           placeId,
           name: formData.name,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMultiplayerSession } from "@/hooks/useRealTime";
 import { VenueRatingDialog } from "./VenueRatingDialog";
@@ -89,6 +89,7 @@ const INITIAL_SUGGESTIONS = [
 
 export function EnhancedChatbot({ onMapUpdate, onOpenDetails, onBook, userLocation, roomId, onShowToast }: EnhancedChatbotProps) {
   const { isSignedIn, user } = useUser();
+  const { getToken } = useAuth();
   const { socket, yDoc } = useMultiplayerSession(roomId || null);
 
   // Presence state
@@ -386,9 +387,13 @@ export function EnhancedChatbot({ onMapUpdate, onOpenDetails, onBook, userLocati
   }) => {
     if (!ratingVenue || !isSignedIn) return;
     try {
+      const token = await getToken();
       await fetch(`/api/venues/${ratingVenue.id}/rate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({
           ...rating,
           venue: {
