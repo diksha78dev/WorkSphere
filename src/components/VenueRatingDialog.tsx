@@ -23,6 +23,7 @@ interface VenueRatingDialogProps {
     hasErgonomic: boolean;
     outletDensity: "every_table" | "some_tables" | "wall_seats" | "none";
     wifiSpeed?: number;
+    lighting?: "natural_daylight" | "warm_ambient" | "fluorescent" | "bright_white";
     speedtestPhoto?: string;
     hasPhoneBooths?: boolean;
     hasNoMusic?: boolean;
@@ -56,6 +57,7 @@ export function VenueRatingDialog({
   const [hasPhoneBooths, setHasPhoneBooths] = useState(false);
   const [hasNoMusic, setHasNoMusic] = useState(false);
   const [hasQuietZone, setHasQuietZone] = useState(false);
+  const [lighting, setLighting] = useState<"natural_daylight" | "warm_ambient" | "fluorescent" | "bright_white" | "">("");
 
   useEffect(() => {
     setMounted(true);
@@ -149,6 +151,7 @@ export function VenueRatingDialog({
         hasErgonomic,
         outletDensity,
         wifiSpeed: wifiSpeed ? parseInt(wifiSpeed, 10) : undefined,
+        lighting: lighting || undefined,
         speedtestPhoto: speedtestPhoto || undefined,
         hasPhoneBooths,
         hasNoMusic,
@@ -167,6 +170,7 @@ export function VenueRatingDialog({
       setHasPhoneBooths(false);
       setHasNoMusic(false);
       setHasQuietZone(false);
+      setLighting("");
       onClose();
     } catch (error) {
       console.error("Error submitting rating:", error);
@@ -369,6 +373,34 @@ export function VenueRatingDialog({
               <option value="every_table">Every Table</option>
               <option value="some_tables">Some Tables</option>
               <option value="wall_seats">Wall Seats Only</option>
+            </select>
+          </section>
+
+          {/* Lighting Quality */}
+          <section>
+            <label className="mb-2 block text-sm font-medium">
+              Lighting Environment
+            </label>
+
+            <select
+              value={lighting}
+              onChange={(event) =>
+                setLighting(
+                  event.target.value as
+                    | "natural_daylight"
+                    | "warm_ambient"
+                    | "fluorescent"
+                    | "bright_white"
+                    | ""
+                )
+              }
+              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800"
+            >
+              <option value="">Not Specified</option>
+              <option value="natural_daylight">Natural Daylight</option>
+              <option value="warm_ambient">Warm Ambient</option>
+              <option value="fluorescent">Fluorescent</option>
+              <option value="bright_white">Bright White</option>
             </select>
           </section>
 

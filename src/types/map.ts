@@ -11,6 +11,8 @@ export interface MapMarker {
   wifiQuality?: number;
   hasOutlets?: boolean;
   noiseLevel?: string;
+  lighting?: string;
+  hasErgonomic?: boolean;
   distance?: string;
   address?: string;
   amenities?: {

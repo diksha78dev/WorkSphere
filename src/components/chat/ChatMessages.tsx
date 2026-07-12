@@ -41,6 +41,7 @@ export interface Venue {
     description?: string;
     hasErgonomic?: boolean;
     outletDensity?: string;
+    lighting?: string;
     wifiSpeed?: number | null;
 }
 

@@ -30,13 +30,14 @@ export async function GET(req: NextRequest) {
       hasPhoneBooths: searchParams.get("hasPhoneBooths"),
       hasNoMusic: searchParams.get("hasNoMusic"),
       hasQuietZone: searchParams.get("hasQuietZone"),
+      lighting: searchParams.get("lighting"),
     });
 
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { lat, lng, radius, category, wifi, outlets, quiet, ergonomic, outletDensity, wifiSpeedBand, hasPhoneBooths, hasNoMusic, hasQuietZone } = validation.data;
+    const { lat, lng, radius, category, wifi, outlets, quiet, ergonomic, outletDensity, wifiSpeedBand, hasPhoneBooths, hasNoMusic, hasQuietZone, lighting } = validation.data;
 
     // Simple bounding box search (for PostgreSQL without PostGIS)
     // Approximate: 1 degree ≈ 111km
@@ -106,6 +107,10 @@ export async function GET(req: NextRequest) {
       where.hasQuietZone = true;
     }
 
+    if (lighting) {
+      where.lighting = lighting;
+    }
+
     const venues = await prisma.venue.findMany({
       where,
       include: {
@@ -142,7 +147,7 @@ export async function POST(req: NextRequest) {
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-    const { name, latitude, longitude, category, address, wifiQuality, hasOutlets, noiseLevel, hasErgonomic, outletDensity, wifiSpeed, hasPhoneBooths, hasNoMusic, hasQuietZone } = validation.data;
+    const { name, latitude, longitude, category, address, wifiQuality, hasOutlets, noiseLevel, hasErgonomic, outletDensity, wifiSpeed, hasPhoneBooths, hasNoMusic, hasQuietZone, lighting } = validation.data;
     const { placeId, rating, imageUrl } = body; // placeId, rating, imageUrl are additional fields
 
     // Validate placeId (required for upsert)
@@ -184,6 +189,7 @@ export async function POST(req: NextRequest) {
         hasPhoneBooths,
         hasNoMusic,
         hasQuietZone,
+        lighting,
         crowdsourced: true,
         requiresReview,
         ...(imageUrl && { imageUrl }),
@@ -205,6 +211,7 @@ export async function POST(req: NextRequest) {
         hasPhoneBooths: hasPhoneBooths || false,
         hasNoMusic: hasNoMusic || false,
         hasQuietZone: hasQuietZone || false,
+        lighting,
         crowdsourced: true,
         requiresReview,
         imageUrl,
