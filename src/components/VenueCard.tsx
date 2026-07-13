@@ -19,6 +19,9 @@ import {
   VolumeX,
   Calendar,
   Printer,
+  Plug,
+  Smartphone,
+  BatteryCharging,
   Car,
   CircleDollarSign,
   Bike,
@@ -795,12 +798,37 @@ export function VenueCard({
               <span>WiFi {venue.wifiQuality}/5</span>
             </div>
           )}
-          {venue.hasOutlets && (
-            <div className="flex items-center gap-1 text-xs text-zinc-700 dark:text-zinc-300">
-              <Zap className="w-4 h-4 text-yellow-600" />
-              <span>Outlets</span>
-            </div>
-          )}
+          {venue.hasOutlets &&
+            (!venue.powerTypes || venue.powerTypes.length === 0) && (
+              <div className="flex items-center gap-1 text-xs text-zinc-700 dark:text-zinc-300">
+                <Zap className="w-4 h-4 text-yellow-600" />
+                <span>Outlets</span>
+              </div>
+            )}
+          {venue.hasOutlets &&
+            venue.powerTypes &&
+            venue.powerTypes.includes("ac_wall") && (
+              <div className="flex items-center gap-1 text-xs text-zinc-700 dark:text-zinc-300">
+                <Plug className="w-4 h-4 text-yellow-600" />
+                <span>AC Outlets</span>
+              </div>
+            )}
+          {venue.hasOutlets &&
+            venue.powerTypes &&
+            venue.powerTypes.includes("usb_c") && (
+              <div className="flex items-center gap-1 text-xs text-zinc-700 dark:text-zinc-300">
+                <Smartphone className="w-4 h-4 text-blue-500" />
+                <span>USB-C PD</span>
+              </div>
+            )}
+          {venue.hasOutlets &&
+            venue.powerTypes &&
+            venue.powerTypes.includes("wireless") && (
+              <div className="flex items-center gap-1 text-xs text-zinc-700 dark:text-zinc-300">
+                <BatteryCharging className="w-4 h-4 text-green-500" />
+                <span>Wireless</span>
+              </div>
+            )}
           {venue.petsAllowedIndoors && (
             <div className="flex items-center gap-1 text-xs text-zinc-700 dark:text-zinc-300">
               <span>🐶 Pets Allowed</span>
