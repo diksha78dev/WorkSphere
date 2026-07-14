@@ -75,6 +75,7 @@ export function VenueCard({
   onRate,
 }: VenueCardProps) {
   const [isFavorited, setIsFavorited] = useState(false);
+  const [isSavingFavorite, setIsSavingFavorite] = useState(false);
   const [enrichData, setEnrichData] = useState<VenueEnrichData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -270,9 +271,20 @@ export function VenueCard({
     enrichVenue();
   }, [venue.name, venue.position]);
 
-  const handleFavorite = () => {
-    setIsFavorited(!isFavorited);
-    onSaveFavorite?.(venue);
+  const handleFavorite = async () => {
+    if (isSavingFavorite) return; // ignore rapid double-clicks
+
+    const previous = isFavorited;
+    setIsSavingFavorite(true);
+    setIsFavorited(!previous);
+    try {
+      await onSaveFavorite?.(venue);
+    } catch (err) {
+      setIsFavorited(previous); // revert optimistic update on failure
+      console.error("Failed to save favorite:", err);
+    } finally {
+      setIsSavingFavorite(false);
+    }
   };
 
   // Cycle through photos
@@ -390,6 +402,14 @@ export function VenueCard({
             </p>
           </div>
           <button
+          onClick={handleFavorite}
+          disabled={isSavingFavorite}
+            className={`p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isFavorited
+            ?  "bg-red-100 dark:bg-red-900/20 text-red-600"
+            : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400"
+        }`}
+>
+          <Heart className={`w-5 h-5 ${isFavorited ? "fill-current" : ""}`} />
             onClick={handleFavorite}
             className={`p-2 rounded-lg transition-colors ${
               isFavorited

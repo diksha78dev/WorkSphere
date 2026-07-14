@@ -10,6 +10,10 @@ WorkSphere runs on Vercel (serverless functions), uses **Neon PostgreSQL** as it
 
 Neon provides two distinct connection endpoints for every project/branch:
 
+| Endpoint type | Hostname pattern | Use for |
+|---|---|---|
+| **Pooled** (PgBouncer) | `ep-xxxx-pooler.region.aws.neon.tech` | Application runtime queries (API routes, serverless functions) |
+| **Direct** (unpooled) | `ep-xxxx.region.aws.neon.tech` | Migrations, schema introspection, long-running admin operations |
 | Endpoint type          | Hostname pattern                      | Use for                                                         |
 | ---------------------- | ------------------------------------- | --------------------------------------------------------------- |
 | **Pooled** (PgBouncer) | `ep-xxxx-pooler.region.aws.neon.tech` | Application runtime queries (API routes, serverless functions)  |
@@ -21,6 +25,7 @@ Neon provides two distinct connection endpoints for every project/branch:
 
 ```bash
 # Pooled connection — used by the app at runtime (Prisma Client / adapter-pg Pool)
+DATABASE_URL="postgresql://user:password@ep-xxxx-pooler.region.aws.neon.tech/dbname?sslmode=require&pgbouncer=true"
 DATABASE_URL="postgresql://user:password@ep-xxxx-pooler.region.aws.neon.tech/dbname?sslmode=require&pgbouncer=true&connection_limit=1"
 
 # Direct connection — used only for migrations (npx prisma migrate deploy / db push)
@@ -29,6 +34,12 @@ DIRECT_URL="postgresql://user:password@ep-xxxx.region.aws.neon.tech/dbname?sslmo
 
 ### Key query parameters
 
+| Parameter | Recommended value | Why |
+|---|---|---|
+| `pgbouncer=true` | `true` | Tells Prisma the target is a PgBouncer-fronted endpoint, which disables features PgBouncer's transaction mode can't support (e.g. Prisma's own prepared-statement caching path, certain advisory-lock usage). |
+| `sslmode` | `require` | Neon requires TLS; this is mandatory. |
+
+> **Note:** `connection_limit`, `pool_timeout`, and `connect_timeout` are Prisma-native-engine URL params and are **not read** when using `@prisma/adapter-pg`, which is what WorkSphere uses. Equivalent settings for this project are configured on the `pg.Pool` instance in `src/lib/prisma.ts` (`max`, `connectionTimeoutMillis`, and an idle/statement timeout) — see the "Client-side pool sizing" section below.
 | Parameter          | Recommended value                    | Why                                                                                                                                                                                                                                                                                                               |
 | ------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pgbouncer=true`   | `true`                               | Tells Prisma the target is a PgBouncer-fronted endpoint, which disables features PgBouncer's transaction mode can't support (e.g. Prisma's own prepared-statement caching path, certain advisory-lock usage).                                                                                                     |
@@ -40,6 +51,7 @@ DIRECT_URL="postgresql://user:password@ep-xxxx.region.aws.neon.tech/dbname?sslmo
 Example with all parameters:
 
 ```
+postgresql://user:password@ep-xxxx-pooler.region.aws.neon.tech/dbname?sslmode=require&pgbouncer=true
 postgresql://user:password@ep-xxxx-pooler.region.aws.neon.tech/dbname?sslmode=require&pgbouncer=true&connection_limit=1&pool_timeout=15&connect_timeout=10
 ```
 
@@ -62,6 +74,26 @@ Neon's pooler runs PgBouncer in **transaction pooling mode**. This has real impl
 
 ### Best practices for WorkSphere's usage
 
+1. **Keep transactions short.** Multi-step Prisma `$transaction([...])` calls (e.g. creating a `Venue` + related `VenueRating` rows) should complete quickly — don't do slow work like external API calls (Pexels, OSRM, Overpass) *inside* a Prisma transaction. Fetch external data first, then write to the database in a short transaction.
+2. **Avoid interactive transactions that wait on user/network input.** Prisma's interactive transaction API (`prisma.$transaction(async (tx) => {...})`) holds a pooled connection open for its entire callback. If the callback awaits a slow network call, it starves the pool. Restructure so all async I/O happens before entering the transaction block.
+3. **Don't rely on transaction pooling for session state.** If a future feature needs session-level features (e.g. `SET search_path`), route that specific query through the **direct** (unpooled) connection, not the pooled one.
+4. **Set an explicit statement timeout for safety.** Since WorkSphere connects via `@prisma/adapter-pg`, set this per-connection when the pool is created, e.g.:
+
+```ts
+   const pool = new Pool({
+     connectionString: process.env.DATABASE_URL,
+     max: 1,
+     idleTimeoutMillis: 10_000,
+     connectionTimeoutMillis: 10_000,
+     statement_timeout: 15_000, // ms — abort any single query that runs longer than this
+   });
+```
+
+   A runaway query in transaction-pooling mode can tie up a backend connection for other tenants of the pool, so this timeout is a safety net independent of query optimization. Keeping queries small and indexed is still good practice, but it doesn't guarantee a bound on worst-case runtime the way an explicit timeout does — treat them as complementary, not equivalent.
+
+### Client-side pool sizing (this is the part WorkSphere controls directly)
+
+Since Neon manages the PgBouncer side, and WorkSphere uses `@prisma/adapter-pg` rather than Prisma's native connection engine, the pooling knob WorkSphere actually configures is the **client-side `pg.Pool`** options passed to the adapter — not any `connection_limit`/`pool_timeout`/`connect_timeout` query params, which this adapter ignores:
 1. **Keep transactions short.** Multi-step Prisma `$transaction([...])` calls (e.g. creating a `Venue` + related `VenueRating` rows) should complete quickly — don't do slow work like external API calls (Pexels, OSRM, Overpass) _inside_ a Prisma transaction. Fetch external data first, then write to the database in a short transaction.
 2. **Avoid interactive transactions that wait on user/network input.** Prisma's interactive transaction API (`prisma.$transaction(async (tx) => {...})`) holds a pooled connection open for its entire callback. If the callback awaits a slow network call, it starves the pool. Restructure so all async I/O happens before entering the transaction block.
 3. **Don't rely on transaction pooling for session state.** If a future feature needs session-level features (e.g. `SET search_path`), route that specific query through the **direct** (unpooled) connection, not the pooled one.
@@ -79,6 +111,7 @@ import { Pool } from "pg";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  max: 1,                 // max connections this Pool instance will open — keep at 1 per serverless instance
   max: 1, // max connections this Pool instance will open — keep at 1 per serverless instance
   idleTimeoutMillis: 10_000,
   connectionTimeoutMillis: 10_000,
@@ -157,6 +190,10 @@ const prisma = new PrismaClient(); // do NOT do this inside a route handler
 
 ### Checklist for WorkSphere specifically
 
+- [ ] Confirm `src/lib/prisma.ts` exports a single cached instance and that it's the *only* place `new PrismaClient()` / `new Pool()` is called in the codebase.
+- [ ] Audit `src/app/api/**/route.ts` files, `src/agents/*.tsx`, and `src/lib/*.ts` for any stray `new PrismaClient()` calls (grep for `new PrismaClient` and `new Pool(`).
+- [ ] Confirm `prisma.config.ts` / migration scripts use `DIRECT_URL`, not the pooled `DATABASE_URL`, since `prisma migrate` needs a session-level connection.
+- [ ] Set `max: 1` on the adapter's `pg.Pool` (in `src/lib/prisma.ts`) so each warm function instance holds at most one pooled connection. Do not rely on `connection_limit` in the URL — it's ignored by `@prisma/adapter-pg`.
 - [ ] Confirm `src/lib/prisma.ts` exports a single cached instance and that it's the _only_ place `new PrismaClient()` / `new Pool()` is called in the codebase.
 - [ ] Audit `src/app/api/**/route.ts` files, `src/agents/*.tsx`, and `src/lib/*.ts` for any stray `new PrismaClient()` calls (grep for `new PrismaClient` and `new Pool(`).
 - [ ] Confirm `prisma.config.ts` / migration scripts use `DIRECT_URL`, not the pooled `DATABASE_URL`, since `prisma migrate` needs a session-level connection.
@@ -168,6 +205,7 @@ const prisma = new PrismaClient(); // do NOT do this inside a route handler
 
 ## Summary
 
+- Use Neon's **pooled** endpoint (`...-pooler...`) for `DATABASE_URL`, with `pgbouncer=true`; use the **direct** endpoint for `DIRECT_URL` (migrations only). Pool sizing (`max: 1`) is configured on the `pg.Pool` in code, not via URL params.
 - Use Neon's **pooled** endpoint (`...-pooler...`) for `DATABASE_URL`, with `pgbouncer=true&connection_limit=1`; use the **direct** endpoint for `DIRECT_URL` (migrations only).
 - Neon's pooler runs **transaction-mode PgBouncer** — keep transactions short, avoid session-level Postgres features, and don't hold a transaction open across external network calls.
 - **Reuse one `PrismaClient`/`pg.Pool` per serverless instance** via a `globalThis`-cached singleton in `src/lib/prisma.ts`; never call `new PrismaClient()` inside a route handler or agent.
