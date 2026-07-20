@@ -5,6 +5,7 @@ import "./globals.css";
 import I18nProvider from "../components/I18nProvider";
 import { ThemeProvider } from "../components/ThemeProvider";
 import { ScrollProgress } from "../components/ui/ScrollProgress";
+import { CookieBanner } from "../components/CookieBanner";
 
 import { headers, cookies } from "next/headers";
 
@@ -136,6 +137,7 @@ export default async function RootLayout({
       >
         <ScrollProgress />
         {bodyContent}
+        <CookieBanner />
       </body>
     </html>
   );
