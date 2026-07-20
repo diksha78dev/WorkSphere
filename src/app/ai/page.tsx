@@ -738,6 +738,7 @@ function AppPage() {
               markers={markers}
               routes={routes}
               mapView={mapView}
+              roomId={sessionId}
             />
           </MapErrorBoundary>
         </div>
