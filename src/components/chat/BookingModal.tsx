@@ -796,9 +796,7 @@ export function BookingModal({
                         min="2"
                         max="12"
                         value={recurringOccurrences}
-                        onChange={(e) =>
-                          setRecurringOccurrences(parseInt(e.target.value) || 2)
-                        }
+                        onChange={(e) => setRecurringOccurrences(parseInt(e.target.value) || 2)}
                         className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-100 dark:border-zinc-700 rounded-[1.25rem] text-sm font-bold focus:ring-4 focus:ring-[color-mix(in_srgb,var(--primary-accent),transparent_0.8)] focus:accent-border outline-none transition-all"
                       />
                     </div>
