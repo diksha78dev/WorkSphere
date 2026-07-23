@@ -12,6 +12,7 @@ const customJestConfig = {
     '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: { jsx: 'react-jsx' } }],
   },
   moduleNameMapper: {
+    '^@/hooks/usePdfSignatureVerifier$': '<rootDir>/src/__mocks__/usePdfSignatureVerifier.ts',
     '^@/(.*)$': '<rootDir>/src/$1',
     // snarkjs/ffjavascript resolve to browser ESM under jsdom — pin CJS for tests
     '^snarkjs$': '<rootDir>/node_modules/snarkjs/build/main.cjs',
