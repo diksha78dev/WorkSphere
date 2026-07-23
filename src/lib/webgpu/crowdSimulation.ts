@@ -319,8 +319,22 @@ export class CrowdSimulationEngine {
 
     const { agentCount, exitPositions, wallSegments } = this.config;
 
-    // Agent buffers (ping-pong)
+    // Validate memory limits
     const agentSize = agentCount * AGENT_STRIDE;
+    const maxBindingSize =
+      this.device.limits?.maxStorageBufferBindingSize || 134217728;
+    const maxBufferSize = this.device.limits?.maxBufferSize || 268435456;
+
+    if (agentSize > maxBindingSize || agentSize > maxBufferSize) {
+      console.warn(
+        `[CrowdSim] Required buffer size ${agentSize} bytes exceeds WebGPU storage buffer limits (maxBindingSize: ${maxBindingSize})`,
+      );
+      throw new Error(
+        `WebGPU memory limit reached: requested ${agentSize} bytes exceeds limit ${maxBindingSize}`,
+      );
+    }
+
+    // Agent buffers (ping-pong)
     this.agentBufferA = this.device.createBuffer({
       size: agentSize,
       usage: BufferUsage.STORAGE | BufferUsage.COPY_SRC | BufferUsage.COPY_DST,
