@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { ensureUserExists } from "@/lib/auth";
@@ -223,7 +223,7 @@ export async function POST(
     }
 
     // Asynchronously update venue with new averages
-    (async () => {
+    after(async () => {
       try {
         const allRatings = await prisma.venueRating.findMany({
           where: { venueId: finalVenueId },
@@ -359,7 +359,6 @@ export async function POST(
         await prisma.venue.update({
           where: { id: finalVenueId },
           data: {
-            rating: avgWifi,
             wifiQuality: Math.round(avgWifi),
             hasOutlets: outletPercent > 50,
             noiseLevel: dominantNoise,
@@ -387,7 +386,7 @@ export async function POST(
       } catch (err) {
         console.error("[RateAPI] Background aggregation failed:", err);
       }
-    })();
+    });
 
     return NextResponse.json({ rating }, { status: 201 });
   } catch (error) {
